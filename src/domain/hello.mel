@@ -1,11 +1,10 @@
-domain  HelloDomain {
+domain HelloDomain {
     state {
-        hello: string
-        counter: number
+        hello: string = "Hello, World!"
+        counter: number = 0
     }
 
     computed doubled = mul(counter, 2)
-    computed isEven = eq(mod(counter, 2), 0)
     computed canDecrement = gt(counter, 0)
 
     action increment() {

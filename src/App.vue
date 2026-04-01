@@ -1,22 +1,34 @@
 <script setup lang="ts">
 import type { HelloDomain } from './domain/hello.domain'
-import { withLineage } from '@manifesto-ai/lineage'
 import { createManifesto } from '@manifesto-ai/sdk'
-import { ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
 import HelloMel from './domain/hello.mel'
 
-const { subscribe, MEL, dispatchAsync, createIntent } = withLineage(
-  createManifesto<HelloDomain>(HelloMel, {}),
-  {},
-).activate()
+const {
+  subscribe,
+  MEL,
+  dispatchAsync,
+  createIntent,
+  getSnapshot,
+  getAvailableActions,
+} = createManifesto<HelloDomain>(HelloMel, {}).activate()
 
-const counter = ref(0)
-const doubled = ref(0)
-const canDecrement = ref(false)
+// Initial values from snapshot — not hardcoded
+const snapshot = getSnapshot()
+const counter = ref(snapshot.data.counter)
+const doubled = ref(snapshot.computed.doubled)
+const canDecrement = ref(snapshot.computed.canDecrement)
+const availableActions = ref(getAvailableActions())
 
-subscribe(snapshot => snapshot.data.counter, value => counter.value = value)
-subscribe(snapshot => snapshot.computed.doubled, value => doubled.value = (value as number))
-subscribe(snapshot => snapshot.computed.canDecrement, value => canDecrement.value = (value as boolean))
+// Subscribe — each returns an unsubscribe function
+const unsubs = [
+  subscribe(s => s.data.counter, v => counter.value = v),
+  subscribe(s => s.computed.doubled, v => doubled.value = v),
+  subscribe(s => s.computed.canDecrement, v => canDecrement.value = v),
+  subscribe(() => getAvailableActions(), v => availableActions.value = v),
+]
+
+onUnmounted(() => unsubs.forEach(fn => fn()))
 
 function increment() {
   dispatchAsync(createIntent(MEL.actions.increment))
@@ -29,9 +41,9 @@ function decrement() {
 
 <template>
   <div>
-    <h1>
-      Hello Mel Counter
-    </h1>
+    <h1>Hello Mel Counter</h1>
+
+    <p>Available Actions: {{ availableActions.join(', ') }}</p>
 
     <p>
       <button @click="increment">
@@ -39,13 +51,8 @@ function decrement() {
       </button>
     </p>
 
-    <p>
-      Counter: {{ counter }}
-    </p>
-
-    <p>
-      Doubled: {{ doubled }}
-    </p>
+    <p>Counter: {{ counter }}</p>
+    <p>Doubled: {{ doubled }}</p>
 
     <p>
       <button :disabled="!canDecrement" @click="decrement">
