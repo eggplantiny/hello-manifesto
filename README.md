@@ -1,60 +1,64 @@
 # hello-manifesto
 
-A minimal counter example that connects a Manifesto MEL domain to a Vue 3 UI.
+![hello-manifesto banner](./banner.png)
 
-This repository is intentionally small. Its job is to show the core loop clearly: define state and actions in MEL, create a runtime with `createManifesto()`, and let Vue subscribe to the Snapshot and render the result.
+Welcome to hello-manifesto.
+This repository is an onboarding project for beginners who want to try Manifesto MEL with a minimal Vue 3 app.
 
-## What This Shows
+## What this project teaches
 
-- `src/domain/hello.mel` defines state, computed values, and actions.
-- `src/App.vue` activates a Manifesto instance and subscribes to the Snapshot.
-- `increment` and `decrement` are dispatched as intents.
-- Computed values like `doubled` and `canDecrement` flow directly into the UI.
-- `decrement()` is guarded by `available when canDecrement`, so the counter never goes below zero.
+By the end of this sample, you should understand:
 
-## Stack
+- How to define state, computed values, and actions in MEL.
+- How to create and activate a Manifesto runtime.
+- How the UI reads runtime snapshots instead of mutating data directly.
+- How to dispatch intents (increment, decrement) from UI actions.
 
-| Area | Choice |
-| --- | --- |
-| UI | Vue 3 |
-| Build | Vite |
-| Language | TypeScript |
-| Domain | MEL |
-| Runtime | `@manifesto-ai/sdk` |
-| Lineage wrapper | `@manifesto-ai/lineage` |
-| Codegen experiment | `@manifesto-ai/compiler`, `@manifesto-ai/codegen` |
+## 1) Prerequisites
 
-## Quick Start
+- Node.js installed (recent LTS recommended)
+- `pnpm` installed
+
+## 2) Install and run
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Once the Vite dev server is running, you can immediately verify the behavior:
+Then open the local dev URL shown by Vite (usually `http://localhost:5173`).
 
-1. Click `+` to increase `counter` by 1.
-2. `doubled` updates automatically as `counter * 2`.
-3. The `-` button is only enabled while `counter > 0`.
+### Quick checks
 
-Production build and preview:
+- Press `+` and watch `Counter` increase.
+- Confirm `Doubled` updates automatically.
+- Confirm `-` is disabled when `Counter` is `0`.
 
-```bash
-pnpm build
-pnpm preview
+## 3) Core files
+
+```text
+.
+├─ src/
+│  ├─ App.vue                  # Connects Vue UI and Manifesto snapshot
+│  ├─ main.ts                  # Vue app entry point
+│  ├─ style.css                # Basic styles
+│  └─ domain/
+│     ├─ hello.mel             # Domain model written in MEL
+│     └─ hello.domain.ts       # Manually provided domain typing
+└─ README.md
 ```
 
-## How It Works
+## 4) How it works (step-by-step)
 
-### 1. Define the MEL domain
+### Step 1. Define the domain in MEL
 
-`src/domain/hello.mel` declares the domain state and rules.
+`src/domain/hello.mel`:
 
 ```mel
 domain HelloDomain {
     state {
-        hello: string
-        counter: number
+        hello: string = "Hello, World!"
+        counter: number = 0
     }
 
     computed doubled = mul(counter, 2)
@@ -74,71 +78,54 @@ domain HelloDomain {
 }
 ```
 
-Key points:
+### Step 2. Activate runtime and read the first snapshot
 
-- State changes happen through `patch`.
-- Action bodies are wrapped in `onceIntent`, so they run once per intent.
-- Button enablement comes from the computed value `canDecrement`, not from ad hoc UI logic.
-
-### 2. Activate the Manifesto instance
-
-In `src/App.vue`, the app creates the Manifesto runtime from the MEL source and exposes the runtime API through `withLineage(...).activate()`.
+In `App.vue`, runtime is created and activated, and the first snapshot is read for initial UI values.
 
 ```ts
-const { subscribe, MEL, dispatchAsync, createIntent } = withLineage(
-  createManifesto<HelloDomain>(HelloMel, {}),
-  {},
-).activate()
+const {
+  subscribe,
+  MEL,
+  dispatchAsync,
+  createIntent,
+  getSnapshot,
+  getAvailableActions,
+} = createManifesto<HelloDomain>(HelloMel, {}).activate()
+
+const snapshot = getSnapshot()
+const counter = ref(snapshot.data.counter)
+const doubled = ref(snapshot.computed.doubled)
+const canDecrement = ref(snapshot.computed.canDecrement)
+const availableActions = ref(getAvailableActions())
 ```
 
-The important point is that Vue does not own the business state directly. It reacts to Manifesto Snapshot updates.
-
-### 3. Subscribe to Snapshot and dispatch intents
-
-The UI subscribes to `data` and `computed` values from the Snapshot.
+### Step 3. Subscribe and keep UI in sync
 
 ```ts
-subscribe(snapshot => snapshot.data.counter, value => counter.value = value)
-subscribe(snapshot => snapshot.computed.doubled, value => doubled.value = (value as number))
-subscribe(snapshot => snapshot.computed.canDecrement, value => canDecrement.value = (value as boolean))
+const unsubs = [
+  subscribe(s => s.data.counter, v => counter.value = v),
+  subscribe(s => s.computed.doubled, v => doubled.value = v),
+  subscribe(s => s.computed.canDecrement, v => canDecrement.value = v),
+  subscribe(() => getAvailableActions(), v => availableActions.value = v),
+]
 ```
 
-Button clicks dispatch intents instead of calling mutation logic directly.
+When the component unmounts, the unsubscribe functions are called.
+
+### Step 4. Dispatch intents from UI events
 
 ```ts
 dispatchAsync(createIntent(MEL.actions.increment))
 dispatchAsync(createIntent(MEL.actions.decrement))
 ```
 
-In short: the UI reads Snapshot state, user input becomes intents, and the domain rules live in MEL.
+## 5) Recommended first onboarding exercises
 
-## Project Structure
+1. Change initial value in `hello.mel` and observe how snapshot updates.
+2. Add a new computed value (ex. `isEven`).
+3. Add a new action that increments by 2.
+4. Add one safety guard using `available when`.
 
-```text
-.
-├─ src/
-│  ├─ App.vue                  # Connects the Vue UI to the Manifesto runtime
-│  ├─ main.ts                  # App entry point
-│  ├─ style.css                # App styles
-│  └─ domain/
-│     ├─ hello.mel             # MEL domain definition
-│     └─ hello.domain.ts       # Manual type definition used by this example
-├─ generated/
-│  └─ types.ts                 # Codegen experiment output
-├─ scripts/
-│  └─ codegen.mjs              # Compiler/codegen experiment script
-└─ README.md
-```
+## 6) Notes
 
-## Notes
-
-- This is a small learning example focused on Snapshot-based flow, not a full application.
-- The example currently uses a manual type definition in `src/domain/hello.domain.ts`.
-- `generated/types.ts` and `scripts/codegen.mjs` are experiment artifacts and are not part of the default runtime path.
-
-## Where To Extend Next
-
-- Connect the `hello` state to an actual greeting in the UI
-- Add an effect and flow asynchronous input back into the Snapshot
-- Replace the manual type with generated types
-- Expand the example from a single counter into a richer domain with more actions and flows
+- This is intentionally small and educational.

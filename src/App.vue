@@ -11,16 +11,15 @@ const {
   createIntent,
   getSnapshot,
   getAvailableActions,
-} = createManifesto<HelloDomain>(HelloMel, {}).activate()
+} = createManifesto<HelloDomain>(HelloMel, {})
+  .activate()
 
-// Initial values from snapshot — not hardcoded
 const snapshot = getSnapshot()
 const counter = ref(snapshot.data.counter)
 const doubled = ref(snapshot.computed.doubled)
 const canDecrement = ref(snapshot.computed.canDecrement)
 const availableActions = ref(getAvailableActions())
 
-// Subscribe — each returns an unsubscribe function
 const unsubs = [
   subscribe(s => s.data.counter, v => counter.value = v),
   subscribe(s => s.computed.doubled, v => doubled.value = v),
@@ -40,24 +39,25 @@ function decrement() {
 </script>
 
 <template>
-  <div>
+  <main class="hello-app">
     <h1>Hello Mel Counter</h1>
+    <p class="intro">
+      This sample shows how UI events become intents in Manifesto.
+    </p>
 
-    <p>Available Actions: {{ availableActions.join(', ') }}</p>
+    <div class="snapshot">
+      <p><strong>Available Actions</strong>: {{ availableActions.join(', ') }}</p>
+      <p><strong>Counter</strong>: {{ counter }}</p>
+      <p><strong>Doubled</strong>: {{ doubled }}</p>
+    </div>
 
-    <p>
+    <div class="actions">
       <button @click="increment">
         +
       </button>
-    </p>
-
-    <p>Counter: {{ counter }}</p>
-    <p>Doubled: {{ doubled }}</p>
-
-    <p>
       <button :disabled="!canDecrement" @click="decrement">
         -
       </button>
-    </p>
-  </div>
+    </div>
+  </main>
 </template>
